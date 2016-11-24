@@ -24,6 +24,9 @@ class YANGPlugin(plugin.PyangPlugin):
             optparse.make_option("--yang-remove-unused-imports",
                                  dest="yang_remove_unused_imports",
                                  action="store_true"),
+            optparse.make_option("--yang-expand-groupings",
+                                 dest="yang_expand_groupings",
+                                 action="store_true"),
             ]
         g = optparser.add_option_group("YANG output specific options")
         g.add_options(optlist)
@@ -33,7 +36,7 @@ class YANGPlugin(plugin.PyangPlugin):
         emit_yang(ctx, module, fd)
 
 def emit_yang(ctx, module, fd):
-    emit_stmt(ctx, module, fd, 0, None, '', '  ')
+    emit_stmt(ctx, module, fd, 0, None, '', '  ', False)
 
 _force_newline_arg = ('description', 'contact', 'organization')
 _non_quote_arg_type = ('identifier', 'identifier-ref', 'boolean', 'integer',
@@ -79,7 +82,7 @@ _keyword_with_trailing_newline = (
     'extension',
     )
 
-def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep):
+def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep, within_uses):
     if ctx.opts.yang_remove_unused_imports and stmt.keyword == 'import':
         for p in stmt.parent.i_unused_prefixes:
             if stmt.parent.i_unused_prefixes[p] == stmt:
@@ -99,6 +102,35 @@ def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep):
 
     if keyword == '_comment':
         emit_comment(stmt.arg, fd, indent)
+        return
+    
+    # Are we in a top level grouping, then don't expand 'uses'
+    # Not doing the right thing.
+    s = stmt
+    in_grouping = False
+    while hasattr(s, 'parent'):
+        if hasattr(s, 'keyword') and s.keyword == 'grouping':
+            in_grouping = True
+        s = s.parent
+#    while (hasattr(s, 'parent') and hasattr(s.parent, 'keyword')
+#           and not (s.parent.keyword == 'module' or s.parent.keyword == 'submodule')):
+#        s = s.parent
+#    if s.keyword == 'grouping':
+#        in_grouping = True
+#    else:
+#        in_grouping = False
+
+    if ctx.opts.yang_expand_groupings and keyword == 'uses' and (within_uses or not in_grouping):
+        fd.write ("\n" + indent + "// Expanded 'uses")
+        emit_arg(stmt, fd, indent, indentstep)
+        fd.write("'\n")
+        for s in stmt.i_grouping.substmts:
+            # Throw out the grouping description statement because it just
+            # clutters the output
+            if s.keyword != 'description':
+                emit_stmt(ctx, s, fd, level, kwd_class,
+                          indent, indentstep, True)
+                kwd_class = get_kwd_class(s.keyword)
         return
 
     fd.write(indent + keyword)
@@ -123,7 +155,7 @@ def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep):
             kwd_class = 'header'
         for s in substmts:
             emit_stmt(ctx, s, fd, level + 1, kwd_class,
-                      indent + indentstep, indentstep)
+                      indent + indentstep, indentstep, within_uses)
             kwd_class = get_kwd_class(s.keyword)
         fd.write(indent + '}\n')
 
