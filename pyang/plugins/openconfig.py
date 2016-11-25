@@ -98,9 +98,33 @@ def i_to_o_container(stmt):
         # Add new leaf-ref keys
         i_to_o_list_keys(stmt, new_node)
 
+    if (stmt.keyword == "container" and
+            stmt.search_one("presence") is not None):
+        # Add an "enabled" leaf of type bool to each new container.
+        enabled = statements.Statement(stmt.top, config, stmt.pos,
+                                       "leaf", "presence")
+        enabled.i_children = []
+        enabled.i_config = True
+        enabled_type = statements.Statement(stmt.top, enabled, stmt.pos,
+                                            "type", "boolean")
+        enabled.substmts.append(enabled_type)
+        enabled_desc = statements.Statement(stmt.top, enabled, stmt.pos,
+                                            "description",
+                                            stmt.search_one("presence").arg)
+        enabled.substmts.append(enabled_desc)
+        config.substmts.append(enabled)
+        config.i_children.append(enabled)
+
+        enabled_s = enabled.copy(parent=state)
+        enabled_s.i_config = False
+        state.substmts.append(enabled)
+        state.i_children.append(enabled)
+
     for child in stmt.i_children:
+        # N.B. This will result in containers as substatements of the
+        # "state" container (e.g. statistics in the interface model).
         if child.i_config:
-            if child.keyword in ("list", "container"):
+            if child.keyword in ("list", "container", "augment"):
                 new_child = i_to_o_container(child)
                 new_node.substmts.append(new_child)
                 new_node.i_children.append(new_child)
@@ -114,6 +138,11 @@ def i_to_o_container(stmt):
                 state.substmts.append(child_copy)
                 state.i_children.append(child_copy)
         else:
+            # Remove the config false statement.
+            config_stmt = child.search_one("config")
+            if config_stmt is not None:
+                child.substmts.remove(config_stmt)
+            # Append the child to the new state container.
             state.substmts.append(child)
             state.i_children.append(child)
 
@@ -135,7 +164,7 @@ def ietf_to_oc(module):
     # Iterate through the tree.
     # Looks for any list with config.
     for child in module.i_children:
-        if child.keyword in ("container", "list"):
+        if child.keyword in ("container", "list", "augment"):
             new_node = i_to_o_container(child)
             try:
                 index = module.substmts.index(child)
