@@ -1,4 +1,6 @@
-# Copyright (c) 2016 by Matthew Green <mgreen89@gmail.com>
+# Copyright (c) 2016 by cisco Systems (Inc)
+#
+# November 2016, Robert Wilton
 #
 # Pyang plugin converting between IETF model formats.
 #
@@ -18,7 +20,7 @@ from pyang.statements import Statement
 """@@@Module docstring"""
 
 #import optparse
-#import re
+import re
 
 from pyang import plugin
 from pyang import util
@@ -43,6 +45,13 @@ class IetfModelPlugin(plugin.PyangPlugin):
         convert_stmt(ctx, module, 0)
         pass
     
+def add_substmt_canonical(parent_stmt, stmt):
+    parent_stmt.substmts.append(stmt)
+    parent_stmt.substmts = grammar.sort_canonical(parent_stmt.keyword, parent_stmt.substmts)
+    
+def fix_references(stmt, elements):
+    for e in elements:
+        stmt.arg = re.sub("(?:)(" + e + ")", stmt.i_module.i_prefix + ":" + e, stmt.arg)
     
 def convert_stmt(ctx, stmt, level):
     if ctx.opts.yang_remove_unused_imports and stmt.keyword == 'import':
@@ -56,85 +65,65 @@ def convert_stmt(ctx, stmt, level):
     else:
         keyword = stmt.keyword
 
-    if keyword == "module":
-        stmt.arg = stmt.arg + '-state'
+    if keyword == 'module':
+        # Change the module name.
+        module_name = stmt.arg
+        stmt.arg = module_name + '-state'
         
-    if keyword == "namespace":
+        # Find the module prefix.
+        prefix_stmt = next(x for x in stmt.substmts if x.keyword == 'prefix')
+        
+        # Rename the prefix statement.
+        prefix = prefix_stmt.arg
+        prefix_stmt.arg = prefix + '-s'
+        
+        # Add an import statement back to the original module.
+        import_stmt = Statement(stmt.top, stmt, stmt.pos, 'import', module_name)
+        add_substmt_canonical(stmt, import_stmt)
+        add_substmt_canonical(import_stmt, Statement(stmt.top, import_stmt, import_stmt.pos, 'prefix', prefix))
+    
+        
+    if keyword == 'namespace':
         stmt.arg = stmt.arg + '-state'
-
-
-    # Convert top level "foo" container to "foo-state", and mark it as config false.
-    if keyword == 'container' and stmt.parent.keyword == 'module':
-        if not stmt.arg.endswith('-state'):
-            stmt.arg = stmt.arg + '-state'
-            stmt.substmts.append(Statement(stmt.top, stmt, stmt.pos, 'config', 'false'))
-            # TODO - Walk down the tree removing any config true statements
+    
+    # Remove any feature statements, reference the original module feature instead.
+    if keyword == 'feature':
+        stmt.parent.substmts.remove(stmt)
+        
+    if keyword == 'if-feature':
+        fix_references(stmt, stmt.i_module.i_features)
             
-    if keyword == 'config' and stmt.arg == 'true':
+    # Remove any identity statements, reference the original identity instead.
+    # Identity base won't matter because they are all removed.
+    if keyword == 'identity':
+        stmt.parent.substmts.remove(stmt)
+        
+    if keyword in ('must', 'when'):
+        fix_references(stmt, stmt.i_module.i_identities)
+            
+    if keyword == 'type' and stmt.arg == 'identityref':
+        base_stmt = next(x for x in stmt.substmts if x.keyword == 'base')
+        fix_references(base_stmt, stmt.i_module.i_identities)
+        
+    # Remove any typedef statements, reference the original typedef instead.
+    if keyword == 'typedef':
+        stmt.parent.substmts.remove(stmt)
+        
+    if keyword == 'type':
+        fix_references(stmt, stmt.i_module.i_typedefs)
+            
+    # Remove all config statements, only the top level config false is necessary.
+    if keyword == 'config':
         stmt.parent.substmts.remove(stmt)
         
     if len(stmt.substmts) != 0:
-        if ctx.opts.yang_canonical:
-            substmts = grammar.sort_canonical(stmt.keyword, stmt.substmts)
-        else:
-            substmts = stmt.substmts
+        substmts = grammar.sort_canonical(stmt.keyword, stmt.substmts)
         for s in substmts:
             convert_stmt(ctx, s, level + 1)
 
-    """kwd_class = get_kwd_class(stmt.keyword)
-    if ((level == 1 and
-         kwd_class != prev_kwd_class and kwd_class != 'extension') or
-        stmt.keyword in _keyword_with_trailing_newline):
-        fd.write('\n')
-
-    if keyword == '_comment':
-        emit_comment(stmt.arg, fd, indent)
-        return
-    
-    # Are we in a top level grouping, then don't expand 'uses'
-    # Not doing the right thing.
-    s = stmt
-    in_grouping = False
-    while hasattr(s, 'parent'):
-        if hasattr(s, 'keyword') and s.keyword == 'grouping':
-            in_grouping = True
-        s = s.parent
-
-    if ctx.opts.yang_expand_groupings and keyword == 'uses' and (within_uses or not in_grouping):
-        fd.write ("\n" + indent + "// Expanded 'uses")
-        emit_arg(stmt, fd, indent, indentstep)
-        fd.write("'\n")
-        for s in stmt.i_grouping.substmts:
-            # Throw out the grouping description statement because it just
-            # clutters the output
-            if s.keyword != 'description':
-                emit_stmt(ctx, s, fd, level, kwd_class,
-                          indent, indentstep, True)
-                kwd_class = get_kwd_class(s.keyword)
-        return
-
-    fd.write(indent + keyword)
-    if stmt.arg != None:
-        if keyword in grammar.stmt_map:
-            (arg_type, _subspec) = grammar.stmt_map[keyword]
-            if arg_type in _non_quote_arg_type:
-                fd.write(' ' + stmt.arg)
-            else:
-                emit_arg(stmt, fd, indent, indentstep)
-        else:
-            emit_arg(stmt, fd, indent, indentstep)
-    if len(stmt.substmts) == 0:
-        fd.write(';\n')
-    else:
-        fd.write(' {\n')
-        if ctx.opts.yang_canonical:
-            substmts = grammar.sort_canonical(stmt.keyword, stmt.substmts)
-        else:
-            substmts = stmt.substmts
-        if level == 0:
-            kwd_class = 'header'
-        for s in substmts:
-            emit_stmt(ctx, s, fd, level + 1, kwd_class,
-                      indent + indentstep, indentstep, within_uses)
-            kwd_class = get_kwd_class(s.keyword)
-        fd.write(indent + '}\n')"""
+    # Convert top level containers from "foo" to "foo-state", and mark it as config false.
+    if keyword == 'container' and stmt.parent.keyword == 'module':
+        if not stmt.arg.endswith('-state'):
+            stmt.arg = stmt.arg + '-state'
+            add_substmt_canonical(stmt, Statement(stmt.top, stmt, stmt.pos, 'config', 'false'))
+            
