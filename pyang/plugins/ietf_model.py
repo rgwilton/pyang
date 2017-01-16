@@ -39,11 +39,11 @@ class IetfModelPlugin(plugin.PyangPlugin):
                              help="From a combined config/state YANG tree, generate an additional IETF state tree")
 
     def post_validate_ctx(self, ctx, modules):
-        # Run the plugin here.
-        module = modules[0]
-        # TODO - Need to copy the original tree here. 
-        convert_stmt(ctx, module, 0)
-        pass
+        if ctx.opts.ietf_combined_to_split:
+            # Run the plugin here.
+            module = modules[0]
+            # TODO - Need to copy the original tree here. 
+            convert_stmt(ctx, module, 0)
     
 def add_substmt_canonical(parent_stmt, stmt):
     parent_stmt.substmts.append(stmt)
