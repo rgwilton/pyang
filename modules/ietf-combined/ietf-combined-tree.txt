@@ -1,0 +1,192 @@
+module: ietf-interfaces-2
+    +--rw interfaces
+       +--rw interface* [name]
+          +--rw name                        string
+          +--rw description?                string
+          +--rw type                        identityref
+          +--rw enabled?                    boolean
+          +--rw link-up-down-trap-enable?   enumeration {if-mib}?
+          +--ro admin-status                enumeration {if-mib}?
+          +--ro oper-status                 enumeration
+          +--ro last-change?                yang:date-and-time
+          +--ro if-index                    int32 {if-mib}?
+          +--ro phys-address?               yang:phys-address
+          +--ro higher-layer-if*            interface-ref
+          +--ro lower-layer-if*             interface-ref
+          +--ro speed?                      yang:gauge64
+          +--ro statistics
+          |  +--ro discontinuity-time    yang:date-and-time
+          |  +--ro in-octets?            yang:counter64
+          |  +--ro in-unicast-pkts?      yang:counter64
+          |  +--ro in-broadcast-pkts?    yang:counter64
+          |  +--ro in-multicast-pkts?    yang:counter64
+          |  +--ro in-discards?          yang:counter32
+          |  +--ro in-errors?            yang:counter32
+          |  +--ro in-unknown-protos?    yang:counter32
+          |  +--ro out-octets?           yang:counter64
+          |  +--ro out-unicast-pkts?     yang:counter64
+          |  +--ro out-broadcast-pkts?   yang:counter64
+          |  +--ro out-multicast-pkts?   yang:counter64
+          |  +--ro out-discards?         yang:counter32
+          |  +--ro out-errors?           yang:counter32
+          +--rw ip:ipv4!
+          |  +--rw ip:enabled?      boolean
+          |  +--rw ip:forwarding?   boolean
+          |  +--rw ip:mtu?          uint16
+          |  +--rw ip:address* [ip]
+          |  |  +--rw ip:ip               inet:ipv4-address-no-zone
+          |  |  +--rw (ip:subnet)
+          |  |  |  +--:(ip:prefix-length)
+          |  |  |  |  +--rw ip:prefix-length?   uint8
+          |  |  |  +--:(ip:netmask)
+          |  |  |     +--rw ip:netmask?         yang:dotted-quad {ipv4-non-contiguous-netmasks}?
+          |  |  +--ro ip:origin?          ip-address-origin
+          |  +--rw ip:neighbor* [ip]
+          |     +--rw ip:ip                    inet:ipv4-address-no-zone
+          |     +--rw ip:link-layer-address    yang:phys-address
+          |     +--ro ip:origin?               neighbor-origin
+          +--rw ip:ipv6!
+             +--rw ip:enabled?                        boolean
+             +--rw ip:forwarding?                     boolean
+             +--rw ip:mtu?                            uint32
+             +--rw ip:address* [ip]
+             |  +--rw ip:ip               inet:ipv6-address-no-zone
+             |  +--rw ip:prefix-length    uint8
+             |  +--ro ip:origin?          ip-address-origin
+             |  +--ro ip:status?          enumeration
+             +--rw ip:neighbor* [ip]
+             |  +--rw ip:ip                    inet:ipv6-address-no-zone
+             |  +--rw ip:link-layer-address    yang:phys-address
+             |  +--ro ip:origin?               neighbor-origin
+             |  +--ro ip:is-router?            empty
+             |  +--ro ip:state?                enumeration
+             +--rw ip:dup-addr-detect-transmits?      uint32
+             +--rw ip:autoconf
+             |  +--rw ip:create-global-addresses?        boolean
+             |  +--rw ip:create-temporary-addresses?     boolean {ipv6-privacy-autoconf}?
+             |  +--rw ip:temporary-valid-lifetime?       uint32 {ipv6-privacy-autoconf}?
+             |  +--rw ip:temporary-preferred-lifetime?   uint32 {ipv6-privacy-autoconf}?
+             +--rw v6ur:ipv6-router-advertisements
+                +--rw v6ur:send-advertisements?    boolean
+                +--rw v6ur:max-rtr-adv-interval?   uint16
+                +--rw v6ur:min-rtr-adv-interval?   uint16
+                +--rw v6ur:managed-flag?           boolean
+                +--rw v6ur:other-config-flag?      boolean
+                +--rw v6ur:link-mtu?               uint32
+                +--rw v6ur:reachable-time?         uint32
+                +--rw v6ur:retrans-timer?          uint32
+                +--rw v6ur:cur-hop-limit?          uint8
+                +--rw v6ur:default-lifetime?       uint16
+                +--rw v6ur:prefix-list
+                   +--rw v6ur:prefix* [prefix-spec]
+                      +--rw v6ur:prefix-spec           inet:ipv6-prefix
+                      +--rw (v6ur:control-adv-prefixes)?
+                      |  +--:(v6ur:no-advertise)
+                      |  |  +--rw v6ur:no-advertise?         empty
+                      |  +--:(v6ur:advertise)
+                      |     +--rw v6ur:valid-lifetime?       uint32
+                      |     +--rw v6ur:on-link-flag?         boolean
+                      |     +--rw v6ur:preferred-lifetime?   uint32
+                      |     +--rw v6ur:autonomous-flag?      boolean
+                      +--ro v6ur:valid-lifetime?       uint32
+                      +--ro v6ur:on-link-flag?         boolean
+                      +--ro v6ur:preferred-lifetime?   uint32
+                      +--ro v6ur:autonomous-flag?      boolean
+module: ietf-routing-2
+    +--rw routing
+       +--rw router-id?                 yang:dotted-quad
+       +--rw control-plane-protocols
+       |  +--rw control-plane-protocol* [type name]
+       |     +--rw type             identityref
+       |     +--rw name             string
+       |     +--rw description?     string
+       |     +--rw static-routes
+       |        +--rw v4ur:ipv4
+       |        |  +--rw v4ur:route* [destination-prefix]
+       |        |     +--rw v4ur:destination-prefix    inet:ipv4-prefix
+       |        |     +--rw v4ur:description?          string
+       |        |     +--rw v4ur:next-hop
+       |        |        +--rw (v4ur:next-hop-options)
+       |        |           +--:(v4ur:simple-next-hop)
+       |        |           |  +--rw v4ur:outgoing-interface?   if:interface-ref
+       |        |           |  +--rw v4ur:next-hop-address?     inet:ipv4-address
+       |        |           +--:(v4ur:special-next-hop)
+       |        |           |  +--rw v4ur:special-next-hop?     enumeration
+       |        |           +--:(v4ur:next-hop-list)
+       |        |              +--rw v4ur:next-hop-list
+       |        |                 +--rw v4ur:next-hop* [index]
+       |        |                    +--rw v4ur:index                 string
+       |        |                    +--rw v4ur:outgoing-interface?   if:interface-ref
+       |        |                    +--rw v4ur:next-hop-address?     inet:ipv4-address
+       |        +--rw v6ur:ipv6
+       |           +--rw v6ur:route* [destination-prefix]
+       |              +--rw v6ur:destination-prefix    inet:ipv6-prefix
+       |              +--rw v6ur:description?          string
+       |              +--rw v6ur:next-hop
+       |                 +--rw (v6ur:next-hop-options)
+       |                    +--:(v6ur:simple-next-hop)
+       |                    |  +--rw v6ur:outgoing-interface?   if:interface-ref
+       |                    |  +--rw v6ur:next-hop-address?     inet:ipv6-address
+       |                    +--:(v6ur:special-next-hop)
+       |                    |  +--rw v6ur:special-next-hop?     enumeration
+       |                    +--:(v6ur:next-hop-list)
+       |                       +--rw v6ur:next-hop-list
+       |                          +--rw v6ur:next-hop* [index]
+       |                             +--rw v6ur:index                 string
+       |                             +--rw v6ur:outgoing-interface?   if:interface-ref
+       |                             +--rw v6ur:next-hop-address?     inet:ipv6-address
+       +--rw ribs
+       |  +--rw rib* [name]
+       |     +--rw name              string
+       |     +--rw address-family?   identityref
+       |     +--rw description?      string
+       |     +--ro default-rib?      boolean {multiple-ribs}?
+       |     +--ro routes
+       |     |  +--ro route*
+       |     |     +--ro route-preference?          route-preference
+       |     |     +--ro next-hop
+       |     |     |  +--ro (next-hop-options)
+       |     |     |     +--:(simple-next-hop)
+       |     |     |     |  +--ro outgoing-interface?      if:interface-ref
+       |     |     |     |  +--ro v4ur:next-hop-address?   inet:ipv4-address
+       |     |     |     |  +--ro v6ur:next-hop-address?   inet:ipv6-address
+       |     |     |     +--:(special-next-hop)
+       |     |     |     |  +--ro special-next-hop?        enumeration
+       |     |     |     +--:(next-hop-list)
+       |     |     |        +--ro next-hop-list
+       |     |     |           +--ro next-hop*
+       |     |     |              +--ro outgoing-interface?   if:interface-ref
+       |     |     |              +--ro v4ur:address?         inet:ipv4-address
+       |     |     |              +--ro v6ur:address?         inet:ipv6-address
+       |     |     +--ro source-protocol            identityref
+       |     |     +--ro active?                    empty
+       |     |     +--ro last-updated?              yang:date-and-time
+       |     |     +--ro v4ur:destination-prefix?   inet:ipv4-prefix
+       |     |     +--ro v6ur:destination-prefix?   inet:ipv6-prefix
+       |     +---x active-route
+       |        +---w input
+       |        |  +---w v4ur:destination-address?   inet:ipv4-address
+       |        |  +---w v6ur:destination-address?   inet:ipv6-address
+       |        +--ro output
+       |           +--ro route
+       |              +--ro next-hop
+       |              |  +--ro (next-hop-options)
+       |              |     +--:(simple-next-hop)
+       |              |     |  +--ro outgoing-interface?      if:interface-ref
+       |              |     |  +--ro v4ur:next-hop-address?   inet:ipv4-address
+       |              |     |  +--ro v6ur:next-hop-address?   inet:ipv6-address
+       |              |     +--:(special-next-hop)
+       |              |     |  +--ro special-next-hop?        enumeration
+       |              |     +--:(next-hop-list)
+       |              |        +--ro next-hop-list
+       |              |           +--ro next-hop*
+       |              |              +--ro outgoing-interface?      if:interface-ref
+       |              |              +--ro v4ur:next-hop-address?   inet:ipv4-address
+       |              |              +--ro v6ur:next-hop-address?   inet:ipv6-address
+       |              +--ro source-protocol            identityref
+       |              +--ro active?                    empty
+       |              +--ro last-updated?              yang:date-and-time
+       |              +--ro v4ur:destination-prefix?   inet:ipv4-prefix
+       |              +--ro v6ur:destination-prefix?   inet:ipv6-prefix
+       +--ro interfaces
+          +--ro interface*   if:interface-ref

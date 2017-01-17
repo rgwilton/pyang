@@ -177,12 +177,6 @@ def ietf_to_oc(module):
     return module
 
 
-def oc_to_ietf(module):
-    """Return a new module tree in IETF format."""
-    # Duplicate the top module node.
-    old_module = copy.copy(module)
-
-
 def pyang_plugin_init():
     plugin.register_plugin(OpenConfigPlugin())
 
@@ -192,9 +186,6 @@ class OpenConfigPlugin(plugin.PyangPlugin):
         ctx.implicit_errors = True
 
     def add_opts(self, optparser):
-        optparser.add_option("--oc-to-ietf", dest="oc_to_ietf",
-                             action="store_true",
-                             help="Convert OpenConfig model format to IETF")
         optparser.add_option("--ietf-to-oc", dest="ietf_to_oc",
                              action="store_true",
                              help="Convert IETF module format to OpenConfig")
