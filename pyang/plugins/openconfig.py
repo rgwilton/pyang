@@ -105,6 +105,7 @@ def i_to_o_container(stmt):
                                        "leaf", "presence")
         enabled.i_children = []
         enabled.i_config = True
+        enabled.i_module = stmt.i_module
         enabled_type = statements.Statement(stmt.top, enabled, stmt.pos,
                                             "type", "boolean")
         enabled.substmts.append(enabled_type)
@@ -158,21 +159,39 @@ def i_to_o_container(stmt):
 
 def ietf_to_oc(module):
     """Return a new module tree in OpenConfig format."""
-    # Duplicate the top module node.
-    old_module = copy.copy(module)
+    module.arg += "-oc"
+    module.i_modulename = module.arg
+
+    if any(c.keyword == "augment" for c in module.substmts):
+        # Find the IETF interfaces import and replace it with
+        # Openconfig interfaces import.
+        imp = statements.Statement(module.top, module, module.pos,
+                                   "import", "openconfig-interfaces")
+        imp.i_module = module
+        pref = statements.Statement(module.top, module, module.pos,
+                                    "prefix", "oc-if")
+        pref.i_module = module
+        imp.substmts = [pref]
+
+        for i, s in enumerate(module.substmts):
+            if s.keyword == "import" and "ietf-interfaces" in s.arg:
+                module.substmts[i] = imp
+                break
 
     # Iterate through the tree.
     # Looks for any list with config.
-    for child in module.i_children:
+    for child in module.substmts:
         if child.keyword in ("container", "list", "augment"):
             new_node = i_to_o_container(child)
+            if child.keyword == "augment":
+                new_node.arg = "/oc-if:interfaces/oc-if:interface"
             try:
-                index = module.substmts.index(child)
-                module.substmts[index] = new_node
-            except IndexError:
+                index = module.i_children.index(child)
+                module.i_children[index] = new_node
+            except ValueError:
                 pass
-            index = module.i_children.index(child)
-            module.i_children[index] = new_node
+            index = module.substmts.index(child)
+            module.substmts[index] = new_node
 
     return module
 
