@@ -92,7 +92,7 @@ def is_config_augment(stmt):
 
 
 # Check that this is an augment of a state container.
-aug_check_pattern = re.compile("^(/[^/]+?)-state(/.*)$")
+aug_check_pattern = re.compile("^(/[^/]+?)-state($|(?:/.*))")
 def is_state_augmentation(stmt):
     is_state_augmentation = False
     
@@ -161,6 +161,33 @@ def convert_stmt(config_stmt, state_stmt):
                                           Statement(copied_stmt.top, copied_stmt, copied_stmt.pos,
                                                     'config', 'false'))
                 
+def fixup_state_grouping(stmt):
+    # Add config: false to every statement that doesn't already have it.
+    
+    # Recurse over groupings statements.
+    if stmt.keyword in {"grouping"}:
+        for s in stmt.substmts:
+            fixup_state_grouping(s)
+        
+    # Fixup any data nodes that can have a status leaf.
+    if stmt.keyword in {"container", "leaf", "leaf-list", "list", "anyxml", "anydata", "choice"}:
+        has_config_true = False
+        has_config_false = False
+        for s in stmt.substmts:
+            if s.keyword == 'config':
+                if s.arg == 'true':
+                    has_config_true = True
+                else:
+                    has_config_false = True
+        if not has_config_false:
+            add_substmt_canonical(stmt,
+                                  Statement(stmt.top, stmt, stmt.pos, 'config', 'false'))
+        if has_config_true:
+            pass
+        for s in stmt.substmts:
+            fixup_state_grouping(s)
+            
+
 def mark_stmt_deprecated(state_stmt):
     # Iterate the state tree
     def can_have_status(stmt):
@@ -232,7 +259,6 @@ def convert_module(ctx, m_stmt):
                                 m_stmt.substmts.remove(s)
                             else:
                                 mark_stmt_deprecated(s)
-                
                             
                 # Handle top level augmentations of config/state containers.
                 if is_state_augmentation(substmt):
@@ -254,4 +280,8 @@ def convert_module(ctx, m_stmt):
                 # Run the fixup on any groupings (e.g. to fix up type references)
                 if substmt.keyword == 'grouping':
                     fixup_stmt(substmt)
+                    
+                # Assume that a grouping only contains state if it is has state in its name.
+                if substmt.keyword == 'grouping' and "-state" in substmt.arg:
+                    fixup_state_grouping(substmt)
         

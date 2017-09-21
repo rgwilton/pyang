@@ -120,7 +120,7 @@ def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep, within_u
 #    else:
 #        in_grouping = False
 
-    if ctx.opts.yang_expand_groupings and keyword == 'uses' and (within_uses or not in_grouping):
+    if ctx.opts.yang_expand_groupings and keyword == 'uses': # and (within_uses or not in_grouping):
         fd.write ("\n" + indent + "// Expanded 'uses")
         emit_arg(stmt, fd, indent, indentstep)
         fd.write("'\n")

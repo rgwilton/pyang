@@ -52,6 +52,25 @@ def add_substmt_canonical(parent_stmt, stmt):
 def fix_references(stmt, elements):
     for e in elements:
         stmt.arg = re.sub("(?:)(" + e + ")", stmt.i_module.i_prefix + ":" + e, stmt.arg)
+
+aug_interfaces_pattern = re.compile("^/(if:interfaces)/.*")
+def is_interface_augmentation(stmt):
+    is_interface_augmentation = False
+    
+    if stmt.keyword == 'augment' and aug_interfaces_pattern.match(stmt.arg):
+        is_interface_augmentation = True
+           
+    return (is_interface_augmentation)
+
+def fix_interface_augmentation(stmt):
+    stmt.arg = aug_interfaces_pattern.sub('if:interfaces-state \1', s)
+    
+    is_interface_augmentation = False
+    
+    if stmt.keyword == 'augment' and aug_interfaces_pattern.match(stmt.arg):
+        is_interface_augmentation = True
+           
+    return (is_interface_augmentation)
     
 def convert_stmt(ctx, stmt, level):
     if ctx.opts.yang_remove_unused_imports and stmt.keyword == 'import':
@@ -139,3 +158,7 @@ def convert_stmt(ctx, stmt, level):
             #stmt.arg = stmt.arg + '-state'
             add_substmt_canonical(stmt, Statement(stmt.top, stmt, stmt.pos, 'config', 'false'))
             
+    #if keyword == 'augment':
+    #    
+    #    # Check that this is an augment of a state container.
+    #    line = re.sub(r"(?i)^.*interfaceOpDataFile.*$", "interfaceOpDataFile %s" % fileIn, line)
