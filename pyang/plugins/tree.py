@@ -14,6 +14,9 @@ def pyang_plugin_init():
     plugin.register_plugin(TreePlugin())
 
 class TreePlugin(plugin.PyangPlugin):
+    def __init__(self):
+        plugin.PyangPlugin.__init__(self, 'tree')
+
     def add_output_format(self, fmts):
         self.multiple_modules = True
         fmts['tree'] = self
@@ -40,6 +43,14 @@ class TreePlugin(plugin.PyangPlugin):
                                  action="store_true",
                                  help="Print groupings"),
             ]
+        if plugin.is_plugin_registered('restconf'):
+            optlist.append(
+                optparse.make_option("--tree-print-yang-data",
+                                     dest="tree_print_yang_data",
+                                     action="store_true",
+                                     help="Print ietf-restconf:yang-data " +
+                                     "structures")
+            )
         g = optparser.add_option_group("Tree output specific options")
         g.add_options(optlist)
 
@@ -91,10 +102,11 @@ Each node is printed as:
     *  for a leaf-list or list
     [<keys>] for a list's keys
 
-  <type> is the name of the type for leafs and leaf-lists
+    <type> is the name of the type for leafs and leaf-lists, or
+           "<anydata>" or "<anyxml>" for anydata and anyxml, respectively
 
     If the type is a leafref, the type is printed as "-> TARGET", where
-    TARGET is either the leafref path, with prefixed removed if possible.
+    TARGET is the leafref path, with prefix removed if possible.
 
   <if-features> is the list of features this node depends on, printed
     within curly brackets and a question mark "{...}?"
@@ -130,9 +142,13 @@ def emit_tree(ctx, modules, fd, depth, llen, path):
             if subm is not None:
                 mods.append(subm)
         for m in mods:
+            section_delimiter_printed=False
             for augment in m.search('augment'):
                 if (hasattr(augment.i_target_node, 'i_module') and
                     augment.i_target_node.i_module not in modules + mods):
+                    if not section_delimiter_printed:
+                        fd.write('\n')
+                        section_delimiter_printed = True
                     # this augment has not been printed; print it
                     if not printed_header:
                         print_header()
@@ -176,13 +192,30 @@ def emit_tree(ctx, modules, fd, depth, llen, path):
             if not printed_header:
                 print_header()
                 printed_header = True
-            fd.write("  groupings:\n")
+            section_delimiter_printed = False
             for gname in module.i_groupings:
-                fd.write('  ' + gname + '\n')
+                if not section_delimiter_printed:
+                    fd.write('\n')
+                    section_delimiter_printed = True
+                fd.write("  grouping %s\n" % gname)
                 g = module.i_groupings[gname]
-                print_children(g.i_children, module, fd, '    ', path,
-                               'grouping', depth, llen)
-                fd.write('\n')
+                print_children(g.i_children, module, fd,
+                               '  ', path, 'grouping', depth, llen)
+
+        if ctx.opts.tree_print_yang_data:
+            yds = module.search(('ietf-restconf', 'yang-data'))
+            if len(yds) > 0:
+                if not printed_header:
+                    print_header()
+                    printed_header = True
+                section_delimiter_printed = False
+                for yd in yds:
+                    if not section_delimiter_printed:
+                        fd.write('\n')
+                        section_delimiter_printed = True
+                    fd.write("  yang-data %s:\n" % yd.arg)
+                    print_children(yd.i_children, module, fd, '    ', path,
+                                   'yang-data', depth, llen)
 
 
 def print_children(i_children, module, fd, prefix, path, mode, depth,
@@ -265,7 +298,7 @@ def print_node(s, module, fd, prefix, path, mode, depth, llen, width):
         if t == '':
             line += "%s %s" % (flags, name)
         elif (llen is not None and
-              len(line) + len(flags) + width+1 + len(t) > llen):
+              len(line) + len(flags) + width+1 + len(t) + 4 > llen):
             # there's no room for the type name
             if (get_leafref_path(s) is not None and
                 len(t) + brcol > llen):
@@ -372,5 +405,9 @@ def get_typename(s):
                 return t.arg
         else:
             return t.arg
+    elif s.keyword == 'anydata':
+        return '<anydata>'
+    elif s.keyword == 'anyxml':
+        return '<anyxml>'
     else:
         return ''

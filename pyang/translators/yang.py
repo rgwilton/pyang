@@ -82,6 +82,12 @@ _keyword_with_trailing_newline = (
     'extension',
     )
 
+_keyword_prefer_squote_arg = (
+    'must',
+    'when',
+    'pattern',
+    )
+
 def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep, within_uses):
     if ctx.opts.yang_remove_unused_imports and stmt.keyword == 'import':
         for p in stmt.parent.i_unused_prefixes:
@@ -135,7 +141,10 @@ def emit_stmt(ctx, stmt, fd, level, prev_kwd_class, indent, indentstep, within_u
 
     fd.write(indent + keyword)
     if stmt.arg != None:
-        if keyword in grammar.stmt_map:
+        if (keyword in _keyword_prefer_squote_arg and
+            stmt.arg.find("'") == -1):
+            fd.write(" '" + stmt.arg + "'")
+        elif keyword in grammar.stmt_map:
             (arg_type, _subspec) = grammar.stmt_map[keyword]
             if arg_type in _non_quote_arg_type:
                 fd.write(' ' + stmt.arg)
@@ -178,7 +187,10 @@ def emit_arg(stmt, fd, indent, indentstep):
         fd.write('\n')
         fd.write(indent + indentstep + '"' + lines[0])
         for line in lines[1:-1]:
-            fd.write(indent + indentstep + ' ' + line)
+            if line[0] == '\n':
+                fd.write('\n')
+            else:
+                fd.write(indent + indentstep + ' ' + line)
         # write last line
         fd.write(indent + indentstep + ' ' + lines[-1])
         if lines[-1][-1] == '\n':

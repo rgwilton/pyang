@@ -15,7 +15,15 @@ python3_test: python3/python
 	env PATH=`pwd`/python3:$(PATH) $(MAKE) itest
 
 itest:
-	@echo -n "selftest... "; ./selftest.py || exit 1; echo "ok";	\
+	@echo "selftest... " | tr -d '\012'; \
+		./selftest.py || exit 1; echo "ok";	\
+	echo "validate all modules... " | tr -d '\012';			\
+	for d in ../modules/*; do					\
+		( cd $$d;						\
+		for m in *.yang; do					\
+			pyang $$m || exit 1;				\
+		done ) || exit 1;					\
+	done || exit 1; echo "ok";					\
 	for d in $(DIRS); do 						\
 		( cd $$d && $(MAKE) test ) || exit 1;			\
 	done
